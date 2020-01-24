@@ -37,6 +37,37 @@ def cloudwatch_notification(message, region):
   }
 
 
+def codecommit_pullrequest_notification(message, region):
+  states = {'Open': 'good', 'Closed': 'warning', 'Merged': 'good'}
+  detail = message.get('detail', [])
+  repository = detail.get('repositoryNames', [])[0]
+  pr_id = detail.get('pullRequestId', '')
+  return {
+    "color": states.get(detail.get('pullRequestStatus', ''), 'good'),
+    "fallback": "New CodeCommit PR submitted",
+    "fields": [
+      { "title": "Pull Request title", "value": detail.get('title', ''), "short": True },
+      { "title": "Pull Request status", "value": detail.get('pullRequestStatus', ''), "short": True },
+      { "title": "Target branch", "value": detail.get('destinationReference', ''), "short": False},
+      {
+        "title": "Link to Pull Request",
+        "value": "https://" + region + ".console.aws.amazon.com/codesuite/codecommit/repositories/" + repository + "/pull-requests/" + pr_id + "/details?region=" + region,
+        "short": False
+      }
+    ]
+  }
+
+
+def codepipeline_notification(message, region):
+  states = {'SUCCEEDED': 'good', 'FAILED': 'warning'}
+  detail = message.get('detail', [])
+  return {
+    "color": states.get(detail.get('State', ''), 'good'),
+    "fields": [
+      { "title": "Pipeline name", "value": detail.get('pipeline', ''), "short": True },
+    ]
+  }
+
 def default_notification(subject, message):
   return {
     "fallback": "A new message",
@@ -70,6 +101,14 @@ def notify_slack(subject, message, region):
   if "AlarmName" in message:
     notification = cloudwatch_notification(message, region)
     payload['text'] = "AWS CloudWatch notification - " + message["AlarmName"]
+    payload['attachments'].append(notification)
+  elif "CodeCommit Pull Request" in message.get('detailType', ''):
+    notification = codecommit_pullrequest_notification(message, region)
+    payload['text'] = "AWS CodeCommit notificaiton - " + message['detailType']
+    payload['attachments'].append(notification)
+  elif "CodePipeline" in message.get('detailType', ''):
+    notification = codepipeline_notification(message, region)
+    payload['text'] = "AWS CodePipeline notificaiton - " + message['detailType']
     payload['attachments'].append(notification)
   else:
     payload['text'] = "AWS notification"

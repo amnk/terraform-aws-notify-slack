@@ -65,6 +65,19 @@ def codepipeline_notification(message, region):
     "color": states.get(detail.get('State', ''), 'good'),
     "fields": [
       { "title": "Pipeline name", "value": detail.get('pipeline', ''), "short": True },
+      { "title": "Pipeline status", "value": detail.get('State', ''), "short": True },
+      { "title": "Commit SHA", "value": detail.get('pipeline', ''), "short": True },
+    ]
+  }
+
+def codebuild_notification(message, region):
+  states = {'SUCCEEDED': 'good', 'FAILED': 'warning'}
+  detail = message.get('detail', [])
+  return {
+    "color": states.get(detail.get('build-status', ''), 'good'),
+    "fields": [
+      { "title": "Commit SHA", "value": detail.get('source-version', ''), "short": True },
+      { "title": "Build ID", "value": detail.get('build-id', ''), "short": True },
     ]
   }
 
@@ -109,6 +122,10 @@ def notify_slack(subject, message, region):
   elif "CodePipeline" in message.get('detailType', ''):
     notification = codepipeline_notification(message, region)
     payload['text'] = "AWS CodePipeline notificaiton - " + message['detailType']
+    payload['attachments'].append(notification)
+  elif "CodeBuild" in message.get('detailType', ''):
+    notification = codebuild_notification(message, region)
+    payload['text'] = "AWS CodeBuild notificaiton - " + message['detailType']
     payload['attachments'].append(notification)
   else:
     payload['text'] = "AWS notification"
